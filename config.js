@@ -17,7 +17,7 @@ window.configureGroqAPI = function(apiKey) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔧 Config.js loaded - initializing Groq API...');
     
-    const GROQ_API_KEY = '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';
+    const GROQ_API_KEY = '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';
     
     setTimeout(() => {
         if (window.studyBuddyAPI) {
