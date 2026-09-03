@@ -3,7 +3,7 @@ class StudyBuddyGroqAPI {
         this.groqKey = null;
         this.groqURL = 'https://api.groq.com/openai/v1/chat/completions';
         this.isEnabled = false;
-        this.model = 'llama-3.3-70b-versatile'; // Updated model name
+        this.model = 'openai/gpt-oss-120b';
         
         // Random topic categories
         this.topicCategories = {
