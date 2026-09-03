@@ -1,10 +1,13 @@
 class StudyBuddyGroqAPI {
     constructor() {
         this.groqKey = null;
-        this.groqURL = 'https://api.groq.com/openai/v1/chat/completions';
-        this.isEnabled = false;
+        this.useProxy = !location.hostname.includes('localhost') && location.hostname !== '127.0.0.1';
+        this.groqURL = this.useProxy
+            ? '/.netlify/functions/groq'
+            : 'https://api.groq.com/openai/v1/chat/completions';
+        this.isEnabled = this.useProxy;
         this.model = 'openai/gpt-oss-120b';
-        
+
         // Random topic categories
         this.topicCategories = {
             science: ['Quantum Physics', 'Marine Biology', 'Genetics', 'Climate Science', 'Neuroscience', 'Astronomy', 'Chemistry', 'Ecology', 'Microbiology'],
@@ -15,23 +18,23 @@ class StudyBuddyGroqAPI {
             psychology: ['Cognitive Psychology', 'Social Psychology', 'Developmental Psychology', 'Behavioral Economics', 'Mental Health', 'Learning Theory']
         };
     }
-    
+
     setApiKey(key) {
         this.groqKey = key;
-        this.isEnabled = !!key;
-        console.log('✅ Groq API configured:', this.isEnabled, 'Key length:', key ? key.length : 0);
+        this.isEnabled = this.useProxy || !!key;
+        console.log('✅ Groq API configured:', this.isEnabled, 'Proxy:', this.useProxy, 'Key length:', key ? key.length : 0);
     }
-    
+
     // ==========================================================================
     // RANDOM TOPIC FUNCTIONS
     // ==========================================================================
-    
+
     generateRandomTopic() {
         const categories = Object.keys(this.topicCategories);
         const randomCategory = categories[Math.floor(Math.random() * categories.length)];
         const topics = this.topicCategories[randomCategory];
         const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-        
+
         return {
             topic: randomTopic,
             category: randomCategory,
@@ -39,11 +42,11 @@ class StudyBuddyGroqAPI {
             categoryColor: this.getCategoryColor(randomCategory)
         };
     }
-    
+
     getRandomTopicOptions(count = 3) {
         const options = [];
         const usedTopics = new Set();
-        
+
         while (options.length < count) {
             const randomTopic = this.generateRandomTopic();
             if (!usedTopics.has(randomTopic.topic)) {
@@ -53,7 +56,7 @@ class StudyBuddyGroqAPI {
         }
         return options;
     }
-    
+
     getCategoryColor(category) {
         const colors = {
             science: '#10b981', technology: '#3b82f6', history: '#f59e0b',
@@ -61,15 +64,15 @@ class StudyBuddyGroqAPI {
         };
         return colors[category] || '#6b7280';
     }
-    
+
     // ==========================================================================
     // LESSON GENERATION
     // ==========================================================================
-    
+
     async generateStudyMaterial(topic, difficulty, description = '') {
         console.log('🎓 Generating lesson for:', topic, 'Difficulty:', difficulty);
-        console.log('🔑 API Enabled:', this.isEnabled, 'Key exists:', !!this.groqKey);
-        
+        console.log('🔑 API Enabled:', this.isEnabled, 'Proxy:', this.useProxy);
+
         if (!this.isEnabled) {
             return `❌ ERROR: Groq API is not enabled!
 
@@ -84,14 +87,14 @@ Current status:
 
 WITHOUT a working API key, you'll only get generic template content.`;
         }
-        
+
         try {
             console.log('🚀 Calling Groq API...');
             const prompt = this.createLessonPrompt(topic, difficulty, description);
             const response = await this.callGroq(prompt);
             console.log('✅ Groq API successful! Response length:', response.length);
             return response;
-            
+
         } catch (error) {
             console.error('❌ Groq API Error:', error.message);
             return `❌ GROQ API ERROR: ${error.message}
@@ -107,11 +110,12 @@ To fix this:
 
 Current API status:
 - Key: ${this.groqKey ? 'Present' : 'Missing'}
+- Proxy: ${this.useProxy}
 - URL: ${this.groqURL}
 - Model: ${this.model}`;
         }
     }
-    
+
     createLessonPrompt(topic, difficulty, description) {
         return `You are an expert educator. Create a comprehensive ${difficulty} level lesson about "${topic}".
 
@@ -150,22 +154,22 @@ Requirements:
 
 ${description ? `Focus on: ${description}` : ''}`;
     }
-    
+
     // ==========================================================================
     // AI QUESTION GENERATION
     // ==========================================================================
-    
+
     async generateQuestions(topic, difficulty, questionType = 'mixed', count = 5) {
         console.log(`🤖 Generating ${questionType} questions for: ${topic}`);
-        
+
         if (!this.isEnabled) {
             console.warn('⚠️ API not enabled, using fallback questions');
             return this.generateFallbackQuestions(topic, questionType, count);
         }
-        
+
         try {
             let prompt;
-            
+
             if (questionType === 'mcq') {
                 prompt = this.createMCQPrompt(topic, difficulty, count);
             } else if (questionType === 'essay') {
@@ -173,19 +177,19 @@ ${description ? `Focus on: ${description}` : ''}`;
             } else {
                 prompt = this.createMixedPrompt(topic, difficulty, count);
             }
-            
+
             const response = await this.callGroq(prompt);
             const questions = this.parseQuestionsResponse(response, questionType);
-            
+
             console.log(`✅ Generated ${questions.length} AI questions`);
             return questions;
-            
+
         } catch (error) {
             console.error('❌ Error generating questions:', error);
             return this.generateFallbackQuestions(topic, questionType, count);
         }
     }
-    
+
     createMCQPrompt(topic, difficulty, count) {
         return `Create ${count} multiple choice questions about "${topic}" at ${difficulty} level.
 
@@ -213,7 +217,7 @@ Requirements:
 
 Return only the JSON, no other text.`;
     }
-    
+
     createEssayPrompt(topic, difficulty, count) {
         return `Create ${count} essay questions about "${topic}" at ${difficulty} level.
 
@@ -241,11 +245,11 @@ Requirements:
 
 Return only the JSON, no other text.`;
     }
-    
+
     createMixedPrompt(topic, difficulty, count) {
         const mcqCount = Math.ceil(count * 0.6); // 60% MCQ
         const essayCount = count - mcqCount; // 40% Essay
-        
+
         return `Create a mixed quiz about "${topic}" at ${difficulty} level with ${mcqCount} multiple choice and ${essayCount} essay questions.
 
 IMPORTANT: Return ONLY valid JSON in this exact format:
@@ -280,31 +284,31 @@ Requirements:
 
 Return only the JSON, no other text.`;
     }
-    
+
     parseQuestionsResponse(response, questionType) {
         try {
             // Clean the response - remove any markdown or extra text
             let cleanResponse = response.trim();
-            
+
             // Try to extract JSON if wrapped in markdown
             const jsonMatch = cleanResponse.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
             if (jsonMatch) {
                 cleanResponse = jsonMatch[1];
             }
-            
+
             // Remove any text before the first { or after the last }
             const startIndex = cleanResponse.indexOf('{');
             const endIndex = cleanResponse.lastIndexOf('}');
             if (startIndex !== -1 && endIndex !== -1) {
                 cleanResponse = cleanResponse.substring(startIndex, endIndex + 1);
             }
-            
+
             const parsed = JSON.parse(cleanResponse);
-            
+
             if (!parsed.questions || !Array.isArray(parsed.questions)) {
                 throw new Error('Invalid response format - missing questions array');
             }
-            
+
             // Validate and clean up questions
             return parsed.questions.map((q, index) => {
                 const question = {
@@ -313,7 +317,7 @@ Return only the JSON, no other text.`;
                     question: q.question || `Question about ${this.selectedTopic}`,
                     points: q.points || (q.type === 'mcq' ? 10 : 20)
                 };
-                
+
                 if (q.type === 'mcq') {
                     question.options = q.options || ['Option A', 'Option B', 'Option C', 'Option D'];
                     question.correctAnswer = q.correctAnswer || 0;
@@ -322,20 +326,20 @@ Return only the JSON, no other text.`;
                     question.keywords = q.keywords || [];
                     question.rubric = q.rubric || 'Look for understanding and examples.';
                 }
-                
+
                 return question;
             });
-            
+
         } catch (error) {
             console.error('❌ Error parsing questions response:', error);
             console.log('Raw response:', response);
             throw new Error('Failed to parse AI response');
         }
     }
-    
+
     generateFallbackQuestions(topic, questionType, count) {
         console.log('🔄 Using fallback question generation');
-        
+
         if (questionType === 'mcq') {
             return this.generateFallbackMCQ(topic, count);
         } else if (questionType === 'essay') {
@@ -349,7 +353,7 @@ Return only the JSON, no other text.`;
             ];
         }
     }
-    
+
     generateFallbackMCQ(topic, count) {
         const templates = [
             {
@@ -386,7 +390,7 @@ Return only the JSON, no other text.`;
                 explanation: `Understanding concepts and practicing applications leads to better mastery.`
             }
         ];
-        
+
         return templates.slice(0, count).map((template, index) => ({
             id: index + 1,
             type: 'mcq',
@@ -397,7 +401,7 @@ Return only the JSON, no other text.`;
             points: 10
         }));
     }
-    
+
     generateFallbackEssay(topic, count) {
         const templates = [
             {
@@ -416,7 +420,7 @@ Return only the JSON, no other text.`;
                 rubric: 'Look for balanced analysis of pros and cons.'
             }
         ];
-        
+
         return templates.slice(0, count).map((template, index) => ({
             id: index + 1,
             type: 'essay',
@@ -426,32 +430,32 @@ Return only the JSON, no other text.`;
             points: 20
         }));
     }
-    
+
     // ==========================================================================
     // AI ESSAY EVALUATION
     // ==========================================================================
-    
+
     async evaluateEssayAnswer(question, userAnswer, topic, difficulty) {
         console.log('🔍 AI evaluating essay answer...');
-        
+
         if (!this.isEnabled || !userAnswer || userAnswer.length < 10) {
             return this.getFallbackEvaluation(userAnswer);
         }
-        
+
         try {
             const prompt = this.createEvaluationPrompt(question, userAnswer, topic, difficulty);
             const response = await this.callGroq(prompt);
             const evaluation = this.parseEvaluationResponse(response);
-            
+
             console.log('✅ AI evaluation completed');
             return evaluation;
-            
+
         } catch (error) {
             console.error('❌ Error in AI evaluation:', error);
             return this.getFallbackEvaluation(userAnswer);
         }
     }
-    
+
     createEvaluationPrompt(question, userAnswer, topic, difficulty) {
         return `Evaluate this student's essay answer about "${topic}" at ${difficulty} level.
 
@@ -485,27 +489,27 @@ Be constructive and encouraging while being accurate. Focus on learning, not jus
 
 Return only the JSON, no other text.`;
     }
-    
+
     parseEvaluationResponse(response) {
         try {
             // Clean the response
             let cleanResponse = response.trim();
-            
+
             // Extract JSON if wrapped in markdown
             const jsonMatch = cleanResponse.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
             if (jsonMatch) {
                 cleanResponse = jsonMatch[1];
             }
-            
+
             // Remove any text before { or after }
             const startIndex = cleanResponse.indexOf('{');
             const endIndex = cleanResponse.lastIndexOf('}');
             if (startIndex !== -1 && endIndex !== -1) {
                 cleanResponse = cleanResponse.substring(startIndex, endIndex + 1);
             }
-            
+
             const evaluation = JSON.parse(cleanResponse);
-            
+
             // Validate and set defaults
             return {
                 score: Math.max(0, Math.min(100, evaluation.score || 70)),
@@ -516,16 +520,16 @@ Return only the JSON, no other text.`;
                 keywordsCovered: evaluation.keywordsCovered || [],
                 missingElements: evaluation.missingElements || []
             };
-            
+
         } catch (error) {
             console.error('❌ Error parsing evaluation response:', error);
             throw new Error('Failed to parse AI evaluation');
         }
     }
-    
+
     getFallbackEvaluation(userAnswer) {
         console.log('🔄 Using fallback evaluation');
-        
+
         if (!userAnswer || userAnswer.length < 10) {
             return {
                 score: 20,
@@ -537,47 +541,47 @@ Return only the JSON, no other text.`;
                 missingElements: ['Detailed explanation', 'Examples', 'Key concepts']
             };
         }
-        
+
         // Simple scoring based on length and content
         let score = Math.min(100, Math.max(30, userAnswer.length * 0.4));
-        
+
         // Bonus points for detailed answers
         if (userAnswer.length > 150) score += 10;
         if (userAnswer.length > 300) score += 10;
-        
+
         // Check for indicators of good answers
         const hasExamples = /example|instance|such as|for example|like/.test(userAnswer.toLowerCase());
         const hasExplanation = /because|therefore|since|due to|as a result/.test(userAnswer.toLowerCase());
         const hasStructure = userAnswer.split(/[.!?]+/).length > 3;
-        
+
         if (hasExamples) score += 8;
         if (hasExplanation) score += 8;
         if (hasStructure) score += 7;
-        
+
         score = Math.min(90, score); // Cap at 90 for fallback
-        
+
         const isCorrect = score >= 60;
-        
+
         const strengths = [];
         const improvements = [];
-        
+
         if (userAnswer.length > 200) strengths.push('Detailed response');
         if (hasExamples) strengths.push('Includes examples');
         if (hasExplanation) strengths.push('Provides explanations');
         if (hasStructure) strengths.push('Well-structured answer');
-        
+
         if (userAnswer.length < 150) improvements.push('Provide more detail');
         if (!hasExamples) improvements.push('Include specific examples');
         if (!hasExplanation) improvements.push('Explain your reasoning');
         if (!hasStructure) improvements.push('Structure your answer in clear sentences');
-        
+
         if (strengths.length === 0) strengths.push('Shows effort in answering');
         if (improvements.length === 0) improvements.push('Continue to expand your knowledge');
-        
+
         return {
             score: Math.round(score),
             isCorrect,
-            feedback: isCorrect ? 
+            feedback: isCorrect ?
                 `Good work! Your answer demonstrates ${strengths.join(' and ')}.${improvements.length > 0 ? ' To improve further: ' + improvements.join(', ') + '.' : ''}` :
                 `Keep studying! Focus on: ${improvements.join(', ')}.${strengths.length > 0 ? ' Good job on: ' + strengths.join(', ') + '.' : ''}`,
             strengths,
@@ -586,24 +590,26 @@ Return only the JSON, no other text.`;
             missingElements: improvements
         };
     }
-    
+
     // ==========================================================================
     // GROQ API CALL
     // ==========================================================================
-    
+
     async callGroq(prompt) {
-        if (!this.groqKey) {
+        if (!this.useProxy && !this.groqKey) {
             throw new Error('API key not configured');
         }
-        
-        console.log('🌐 Making Groq API request...');
-        
+
+        console.log('🌐 Making Groq API request...', this.useProxy ? '(via proxy)' : '(direct)');
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (!this.useProxy) {
+            headers['Authorization'] = `Bearer ${this.groqKey}`;
+        }
+
         const response = await fetch(this.groqURL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.groqKey}`,
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({
                 model: this.model,
                 messages: [{ role: 'user', content: prompt }],
@@ -611,37 +617,37 @@ Return only the JSON, no other text.`;
                 temperature: 0.7
             })
         });
-        
+
         console.log('📡 API Response status:', response.status);
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error('API Error Response:', errorText);
             throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
-        
+
         const data = await response.json();
         console.log('📋 API Response received');
-        
+
         if (!data.choices || !data.choices[0] || !data.choices[0].message) {
             throw new Error('Invalid API response format');
         }
-        
+
         return data.choices[0].message.content.trim();
     }
-    
+
     // For backward compatibility
     async callGemini(prompt) {
         return this.callGroq(prompt);
     }
-    
+
     // ==========================================================================
     // ERROR DIAGNOSIS
     // ==========================================================================
-    
+
     diagnoseError(error) {
         const msg = error.message.toLowerCase();
-        
+
         if (msg.includes('401') || msg.includes('unauthorized')) {
             return '🔑 Invalid API key - check your Groq API key in config.js';
         }
@@ -656,16 +662,16 @@ Return only the JSON, no other text.`;
         }
         return '❓ Unknown error - check Groq console for details';
     }
-    
+
     // ==========================================================================
     // LEGACY METHODS (for backward compatibility)
     // ==========================================================================
-    
+
     async generateQuestion(topic, difficulty) {
         if (!this.isEnabled) {
             return `Create a detailed answer explaining what ${topic} is, its key concepts, and real-world applications. Base your answer on the lesson content.`;
         }
-        
+
         try {
             const prompt = `Create a ${difficulty} level essay question about "${topic}" that tests real understanding. Make it thought-provoking and specific to ${topic}.`;
             const response = await this.callGroq(prompt);
@@ -674,7 +680,7 @@ Return only the JSON, no other text.`;
             return `Explain the key concepts of ${topic} covered in the lesson and provide specific examples of how it's applied in the real world.`;
         }
     }
-    
+
     async evaluateAnswer(question, userAnswer, topic) {
         const score = this.calculateBasicScore(userAnswer);
         return {
@@ -683,20 +689,20 @@ Return only the JSON, no other text.`;
             feedback: `Score: ${score}/100\n\n${score >= 80 ? '✅ Excellent work!' : score >= 60 ? '👍 Good effort!' : '📚 Keep studying!'}`
         };
     }
-    
+
     async generateHint(question, userAttempt, topic) {
         return `💡 Think about the main concepts from the lesson about ${topic}. What were the key principles and examples discussed?`;
     }
-    
+
     calculateBasicScore(answer) {
         let score = 30;
         if (answer.length > 150) score += 30;
         else if (answer.length > 75) score += 20;
         else if (answer.length > 30) score += 15;
-        
+
         const sentences = answer.split(/[.!?]+/).filter(s => s.trim().length > 0);
         if (sentences.length > 2) score += 20;
-        
+
         if (answer.includes('example')) score += 10;
         return Math.min(score, 95);
     }
